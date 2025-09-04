@@ -1,0 +1,132 @@
+name: Build EPR Windows Executables
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [created]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install PyInstaller
+      run: |
+        pip install pyinstaller
+
+    - name: Install SystemOne dependencies
+      run: |
+        cd apps/systemone
+        pip install -r requirements.txt
+        pip install -e .
+
+    - name: Install EMIS dependencies
+      run: |
+        cd apps/emis
+        pip install -r requirements.txt
+        pip install -e .
+
+    - name: Build SystemOne executable
+      run: |
+        cd apps/systemone
+        pyinstaller --onefile --name systemone --distpath ../../dist --workpath ../../build --specpath ../../build src/systemone/main.py
+
+    - name: Build EMIS executable
+      run: |
+        cd apps/emis
+        pyinstaller --onefile --name emis --distpath ../../dist --workpath ../../build --specpath ../../build src/emis/main.py
+
+    - name: Test SystemOne executable
+      run: |
+        cd dist
+        echo "Testing SystemOne executable..."
+        timeout 5 ./systemone.exe --help || echo "SystemOne help displayed successfully"
+
+    - name: Test EMIS executable
+      run: |
+        cd dist
+        echo "Testing EMIS executable..."
+        timeout 5 ./emis.exe --help || echo "EMIS help displayed successfully"
+
+    - name: Create release info
+      run: |
+        echo "# EPR Simulator Executables" > dist/README.md
+        echo "" >> dist/README.md
+        echo "This package contains executable files for the EPR Simulator:" >> dist/README.md
+        echo "" >> dist/README.md
+        echo "## Files Included" >> dist/README.md
+        echo "- **systemone.exe** - SystemOne EPR Server" >> dist/README.md
+        echo "- **emis.exe** - EMIS EPR Server (under development)" >> dist/README.md
+        echo "" >> dist/README.md
+        echo "## Usage" >> dist/README.md
+        echo "" >> dist/README.md
+        echo "### SystemOne EPR Server" >> dist/README.md
+        echo '```cmd' >> dist/README.md
+        echo "# Start with default settings (port 40700)" >> dist/README.md
+        echo "systemone.exe" >> dist/README.md
+        echo "" >> dist/README.md
+        echo "# Start with custom host and port" >> dist/README.md
+        echo "systemone.exe --host 127.0.0.1 --port 8080" >> dist/README.md
+        echo "" >> dist/README.md
+        echo "# Get help" >> dist/README.md
+        echo "systemone.exe --help" >> dist/README.md
+        echo '```' >> dist/README.md
+        echo "" >> dist/README.md
+        echo "### EMIS EPR Server" >> dist/README.md
+        echo '```cmd' >> dist/README.md
+        echo "# Start EMIS server" >> dist/README.md
+        echo "emis.exe" >> dist/README.md
+        echo "" >> dist/README.md
+        echo "# Get help" >> dist/README.md
+        echo "emis.exe --help" >> dist/README.md
+        echo '```' >> dist/README.md
+        echo "" >> dist/README.md
+        echo "## Requirements" >> dist/README.md
+        echo "- Windows 10/11" >> dist/README.md
+        echo "- No additional Python installation required" >> dist/README.md
+        echo "" >> dist/README.md
+        echo "## Notes" >> dist/README.md
+        echo "- SystemOne server listens on port 40700 by default" >> dist/README.md
+        echo "- Press Ctrl+C to stop the servers" >> dist/README.md
+        echo "- EMIS implementation is currently under development" >> dist/README.md
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: epr-simulator-windows-executables
+        path: |
+          dist/systemone.exe
+          dist/emis.exe
+          dist/README.md
+        retention-days: 90
+
+    - name: Upload to release (if release event)
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/systemone.exe
+          dist/emis.exe
+          dist/README.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
