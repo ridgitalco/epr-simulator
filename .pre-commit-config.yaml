@@ -1,0 +1,89 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: no-commit-to-branch
+        args:
+          - --branch=main
+
+      - id: check-json
+      - id: pretty-format-json
+        args:
+          - --autofix
+          - --no-sort-keys
+
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        language_version: python3.13
+
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.2.0
+    hooks:
+      - id: flake8
+        additional_dependencies:
+          - flake8-docstrings
+          - flake8-annotations
+
+        args:
+          - --max-doc-length=79
+          - --docstring-convention=google
+          # D100 Missing docstring in public module
+          # D104 Missing docstring in public package
+          # D105 Missing docstring in magic method
+          # D107 Missing docstring in __init__
+          # E203 whitespace before ':'
+          # E501 Line too long (> 79 characters)
+          # W503 Line break before binary operator
+          # ANN002 Missing type annotation for *args
+          # ANN003 Missing type annotation for **kwargs
+          # ANN101 Missing type annotation for self in method
+          # ANN102 Missing type annotation for cls in classmethod
+          # ANN401 Dynamically typed expressions (typing.Any) are disallowed
+          - --ignore=
+            - D100
+            - D104
+            - D105
+            - D107
+            - E203
+            - E501
+            - W503
+            - ANN002
+            - ANN003
+            - ANN101
+            - ANN102
+            - ANN401
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 6.0.1
+    hooks:
+      - id: isort
+        args:
+          - --profile=black
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args:
+          - --exclude-files=env.py
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.3
+    hooks:
+      - id: bandit
+        exclude: '(^|/)(tests|data)(/|$)'
+        args:
+          - --severity-level=all
+          - --confidence-level=all
+          # B110: try_except_pass
+          # B112: try_except_continue
+          # B314: blacklist
+          # B405: blacklist
+          # TODO: Remove B110, B112, B314, B405 after fixing all occurrences
+          - --skip=B110,B112,B314,B405

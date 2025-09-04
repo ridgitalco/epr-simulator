@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "epr"
+version = "0.1.0"
+description = "EPR"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.setuptools]
+py-modules = []
+packages = []
