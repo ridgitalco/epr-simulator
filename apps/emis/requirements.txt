@@ -2,3 +2,4 @@ python-dotenv==1.1.1
 xmltodict==0.14.2
 Faker==37.6.0
 lxml==6.0.1
+typer-slim[standard]==0.17.3

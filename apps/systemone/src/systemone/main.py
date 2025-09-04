@@ -1,16 +1,24 @@
 """EPR System One Server.
 
-Main server that listens on TCP port 407000 and handles XML requests.
+Main server that listens on TCP port 40700 and handles XML requests.
 """
 
 import logging
+import signal
 import socket
 import sys
 from logging import Logger
 from socket import socket as Socket
-from typing import Optional
+from typing import Any, Optional
 
-from systemone import SystemOne
+import typer
+from systemone.systemone import SystemOne
+
+app = typer.Typer(
+    help="System One EPR Server",
+    name="systemone",
+    no_args_is_help=False,
+)
 
 
 def setup_logging() -> logging.Logger:
@@ -23,23 +31,14 @@ def setup_logging() -> logging.Logger:
     console_formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    file_formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
-    )
 
     # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(console_formatter)
 
-    # File handler for system logs
-    file_handler = logging.FileHandler("/var/log/epr_system_one.log", mode="a")
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(file_formatter)
-
     # Add handlers to logger
     logger.addHandler(console_handler)
-    logger.addHandler(file_handler)
 
     return logger
 
@@ -47,7 +46,7 @@ def setup_logging() -> logging.Logger:
 class EPRSystemOneServer:
     """EPR System One TCP Server."""
 
-    def __init__(self, host: str, port: int = 407000) -> None:
+    def __init__(self, host: str, port: int = 40700) -> None:
         self.host = host
         self.port = port
         self.server_socket: Optional[Socket] = None
@@ -57,9 +56,19 @@ class EPRSystemOneServer:
 
     def start_server(self) -> None:
         """Start the EPR System One server."""
+
+        def signal_handler(signum: int, frame: Any) -> None:
+            self.logger.info("Received signal %s, shutting down server...", signum)
+            self.stop_server()
+
+        # Set up signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+
         try:
             self.server_socket = Socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.server_socket.settimeout(1.0)
             self.server_socket.bind((self.host, self.port))
             self.server_socket.listen(5)
 
@@ -74,8 +83,12 @@ class EPRSystemOneServer:
                 try:
                     client_socket, address = self.server_socket.accept()
                     self._handle_client(client_socket, address)
-                except socket.error:
+                except socket.timeout:
+
+                    continue
+                except socket.error as e:
                     if self.running:
+                        self.logger.error("Socket error: %s", e)
                         break
 
         except Exception as e:
@@ -138,23 +151,24 @@ class EPRSystemOneServer:
                 pass
 
 
-def main() -> None:
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context, host: str = "0.0.0.0", port: int = 40700) -> None:  # nosec
     """Main function to run the EPR System One server."""
-    print("EPR System One Server")
-    print(
+    typer.echo("EPR System One Server")
+    typer.echo(
         "This server implements System One EPR functionality with XML-based communication."
     )
-    print("Listening on port 407000 for ClientIntegrationRequest messages.")
-    print("Logs are written to console and /var/log/epr_system_one.log\n")
+    typer.echo(f"Listening on port {port} for ClientIntegrationRequest messages.")
 
     try:
-        server = EPRSystemOneServer(host="0.0.0.0", port=407000)  # nosec
+        server = EPRSystemOneServer(host=host, port=port)
         server.start_server()
     except KeyboardInterrupt:
-        print("\n\nServer interrupted by user")
+        typer.echo("\n\nServer interrupted by user")
     except Exception as e:
-        print(f"\nServer error: {e}")
+        typer.echo(f"\nServer error: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    app()
+    app()
